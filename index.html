@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Orçamento Villa dos Anjos</title>
+    <!-- Tailwind CSS para o visual -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Ícones FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Bibliotecas React e Babel -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+      body { background-color: #fafafa; }
+      .transition-all { transition: all 0.3s ease; }
+      
+      /* Ocultar barra de rolagem horizontal para os carrosséis */
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      
+      .animate-fade-in { animation: fadeIn 0.4s ease-out forwards; }
+      @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(-5px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useRef } = React;
+
+        // =====================================================================
+        // CONFIGURAÇÕES GERAIS
+        // =====================================================================
+        const WHATSAPP_NUMBER = "5577988763286"; 
+        
+        // Avatar confiável
+        const AVATAR_URL = "https://i.pravatar.cc/150?img=5";
+
+        const DECORATION_TYPES = [
+          { id: 'Casamento', label: 'Casamento' },
+          { id: 'Aniversário', label: 'Aniversário' },
+          { id: 'Infantil', label: 'Infantil' },
+          { id: 'Debutante', label: 'Debutante' },
+          { id: 'Formatura Dia', label: 'Formatura Dia' },
+          { id: 'Formatura Noite', label: 'Formatura Noite' },
+          { id: 'Confraternização', label: 'Confraternização' },
+          { id: 'Corporativo', label: 'Corporativo' }
+        ];
+
+        const DECORATION_LEVELS = ['Simples', 'Completa', 'Luxo'];
+        const CHURCH_DECORATION_OPTIONS = ['Não', 'Simples', 'Completa', 'Luxo', 'Super Luxo'];
+
+        const BUFFET_FIXED = [
+          { id: 'self_service', label: 'Buffet Self Service' },
+          { id: 'asiatico', label: 'Buffet Asiático' },
+          { id: 'degustacao_premium', label: 'Mesa Degustação Premium' },
+          { id: 'degustacao_standard', label: 'Mesa Degustação Standard' },
+          { id: 'ilha_massas', label: 'Ilha de Massas' },
+          { id: 'mexicano', label: 'Buffet Mexicano' },
+          { id: 'mesa_frios', label: 'Mesa de Frios' },
+          { id: 'mini_acarajes', label: 'Mini Acarajés' },
+          { id: 'piquenique_infantil', label: 'Piquenique Infantil' },
+        ];
+
+        const BUFFET_VARIABLE = [
+          { id: 'salgados_trad', label: 'Salgados Tradicionais' },
+          { id: 'salgados_finos', label: 'Salgados Finos' },
+          { id: 'doces_trad', label: 'Doces Tradicionais' },
+          { id: 'doces_finos', label: 'Doces Finos' },
+          { id: 'canapes', label: 'Canapés' },
+          { id: 'mini_empratados', label: 'Mini Empratados' },
+          { id: 'espetinhos', label: 'Espetinhos Churrasco' },
+          { id: 'mini_fast_food', label: 'Mini Fast Food' },
+        ];
+
+        const BEVERAGE_TYPES = [
+          { id: 'sem_alcool', label: 'Sem Álcool' },
+          { id: 'com_alcool', label: 'Com Álcool' },
+          { id: 'com_alcool_premium', label: 'Com Álcool Premium' },
+        ];
+
+        const DRINK_TYPES = [
+          { id: 'sem_drinks', label: 'Sem Drinks' },
+          { id: 'drinks_sem_alcool', label: 'Drinks Sem Álcool' },
+          { id: 'drinks_standard', label: 'Drinks Simples' },
+          { id: 'drinks_premium', label: 'Drinks Premium' },
+          { id: 'drinks_luxo', label: 'Drinks Luxo' },
+        ];
+
+        const ENTERTAINMENT_OPTIONS = [
+          { id: 'son_standard', label: 'Sonorização Simples' },
+          { id: 'son_prof', label: 'Sonorização Profissional' },
+          { id: 'voz_violao', label: 'Voz e Violão' },
+          { id: 'banda_standard', label: 'Banda Standard' },
+          { id: 'banda_premium', label: 'Banda Premium' },
+          { id: 'banda_luxo', label: 'Banda Luxo' },
+          { id: 'banda_inst', label: 'Banda Instrumental' },
+          { id: 'dj_standard', label: 'DJ Standard' },
+          { id: 'dj_premium', label: 'DJ Premium' },
+          { id: 'dj_luxo', label: 'DJ Luxo' },
+          { id: 'pista_led', label: 'Pista de LED' },
+          { id: 'brinquedos', label: 'Brinquedos & Guloseimas' },
+        ];
+
+        // =====================================================================
+        // COMPONENTE: POST DO INSTAGRAM
+        // =====================================================================
+        const InstagramPost = ({ avatar, username, location, images, isOpen, onToggle, description, children, hideAction = false, actionText }) => {
+          const scrollRef = useRef(null);
+          const [activeSlide, setActiveSlide] = useState(0);
+
+          const handleScroll = () => {
+            if (scrollRef.current) {
+              const scrollPosition = scrollRef.current.scrollLeft;
+              const width = scrollRef.current.offsetWidth;
+              setActiveSlide(Math.round(scrollPosition / width));
+            }
+          };
+
+          return (
+            <div className="bg-white border border-zinc-200 sm:rounded-lg mb-6 shadow-sm overflow-hidden w-full max-w-lg mx-auto">
+              {/* Header do Post */}
+              <div className="flex items-center justify-between p-3 border-b border-zinc-100">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full p-[2px] bg-gradient-to-tr from-yellow-400 to-fuchsia-600">
+                    <img src={avatar} className="w-full h-full rounded-full object-cover border-2 border-white" alt="Avatar" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-[13px] text-zinc-900 leading-tight">{username}</p>
+                    {location && <p className="text-[11px] text-zinc-500">{location}</p>}
+                  </div>
+                </div>
+                <button className="text-zinc-900"><i className="fa-solid fa-ellipsis"></i></button>
+              </div>
+
+              {/* Imagens (Carrossel) */}
+              <div className="relative bg-zinc-100">
+                <div 
+                  ref={scrollRef}
+                  onScroll={handleScroll}
+                  className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar aspect-square sm:aspect-[4/5]"
+                >
+                  {images.map((img, i) => (
+                    <img 
+                      key={i} 
+                      src={img} 
+                      onError={(e) => { e.target.onerror = null; e.target.src = `https://placehold.co/800x1000/e2e8f0/64748b?text=Inspiracao+${i+1}`; }}
+                      className="w-full h-full object-cover shrink-0 snap-center" 
+                      alt={`Slide ${i}`} 
+                    />
+                  ))}
+                </div>
+                {/* Indicadores de Slide */}
+                {images.length > 1 && (
+                  <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-1.5">
+                    {images.map((_, i) => (
+                      <div key={i} className={`h-1.5 rounded-full transition-all ${i === activeSlide ? 'w-1.5 bg-blue-500' : 'w-1.5 bg-white/70'}`} />
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Ações e Interações */}
+              <div className="p-4">
+                <div className="text-[14px] leading-relaxed mb-4">
+                  <span className="font-semibold mr-2">{username}</span>
+                  {description}
+                </div>
+
+                {!hideAction && (
+                  <button 
+                    onClick={onToggle}
+                    className={`w-full py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 border ${isOpen ? 'bg-zinc-50 text-zinc-500 border-zinc-200' : 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100'}`}
+                  >
+                    {isOpen ? <><i className="fa-solid fa-chevron-up"></i> Ocultar opções</> : <>👇 Clique aqui para {actionText}</>}
+                  </button>
+                )}
+
+                {/* Formulário/Opções (Visível apenas se "isOpen" ou se hideAction for true) */}
+                {(isOpen || hideAction) && (
+                  <div className="pt-4 mt-2 animate-fade-in space-y-4">
+                    {children}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        };
+
+        // =====================================================================
+        // COMPONENTE PRINCIPAL
+        // =====================================================================
+        function App() {
+          const today = new Date().toLocaleDateString('en-CA');
+          
+          const [error, setError] = useState('');
+          const [clientName, setClientName] = useState('');
+          const [clientPhone, setClientPhone] = useState('');
+          const [guests, setGuests] = useState(50);
+          const [selectedDate, setSelectedDate] = useState(today);
+          
+          const [hasDecoration, setHasDecoration] = useState(false);
+          const [decorationType, setDecorationType] = useState('Casamento');
+          const [decorationLevel, setDecorationLevel] = useState('Simples');
+          const [churchDecoration, setChurchDecoration] = useState('Não');
+
+          const [hasBuffet, setHasBuffet] = useState(false);
+          const [buffetFixedSelections, setBuffetFixedSelections] = useState({});
+          const [buffetVarSelections, setBuffetVarSelections] = useState({});
+          const [hasCake, setHasCake] = useState(false);
+          
+          const [hasBeverages, setHasBeverages] = useState(false);
+          const [beverageSelection, setBeverageSelection] = useState('sem_alcool');
+          const [drinkSelection, setDrinkSelection] = useState('sem_drinks');
+          
+          const [hasEntertainment, setHasEntertainment] = useState(false);
+          const [entertainmentSelections, setEntertainmentSelections] = useState({});
+
+          const MINIMUM_GUESTS = 30;
+
+          const formatDateBR = (dateString) => {
+            if (!dateString) return '';
+            const [y, m, d] = dateString.split('-');
+            return `${d}/${m}/${y}`;
+          };
+
+          // Preparar listas para exibição no resumo
+          const buffetItemsList = [];
+          if (hasBuffet) {
+            BUFFET_FIXED.forEach(item => {
+              if (buffetFixedSelections[item.id]) buffetItemsList.push(item.label);
+            });
+            BUFFET_VARIABLE.forEach(item => {
+              const sel = buffetVarSelections[item.id];
+              if (sel?.selected) buffetItemsList.push(`${item.label} (x${sel.qty})`);
+            });
+            if (hasCake) buffetItemsList.push('Bolo Cenográfico + Bolo de Corte');
+          }
+
+          const entItemsList = [];
+          if (hasEntertainment) {
+            ENTERTAINMENT_OPTIONS.forEach(item => {
+              if (entertainmentSelections[item.id]) entItemsList.push(item.label);
+            });
+          }
+
+          const handleSendWhatsApp = () => {
+            if (!clientName || !clientPhone) {
+              setError("Preencha seu Nome e Telefone no primeiro post para continuarmos!");
+              setTimeout(() => setError(''), 4000);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+              return;
+            }
+
+            let msg = `*SOLICITAÇÃO DE ORÇAMENTO - VILLA DOS ANJOS*\n\n`;
+            msg += `*Nome:* ${clientName}\n`;
+            msg += `*WhatsApp:* ${clientPhone}\n`;
+            msg += `*Data:* ${formatDateBR(selectedDate)}\n`;
+            msg += `*Convidados:* ${guests}\n`;
+            msg += `*Tipo de Evento:* ${decorationType}\n\n`;
+
+            msg += `*PREFERÊNCIAS SELECIONADAS:*\n`;
+            msg += `• *Decoração:* ${hasDecoration ? `${decorationType} (${decorationLevel})` : 'Não solicitada'}\n`;
+            if (hasDecoration && decorationType === 'Casamento') {
+                msg += `  - Igreja: ${churchDecoration}\n`;
+            }
+
+            msg += `• *Buffet:* ${hasBuffet ? 'Sim' : 'Não'}\n`;
+            if (hasBuffet && buffetItemsList.length > 0) {
+                buffetItemsList.forEach(item => msg += `  - ${item}\n`);
+            }
+
+            msg += `• *Bebidas:* ${hasBeverages ? (BEVERAGE_TYPES.find(b=>b.id===beverageSelection)?.label || 'Sim') : 'Não'}\n`;
+            if (hasBeverages && drinkSelection !== 'sem_drinks') {
+                msg += `  - Drinks: ${DRINK_TYPES.find(d=>d.id===drinkSelection)?.label}\n`;
+            }
+
+            if (entItemsList.length > 0) {
+                msg += `• *Entretenimento:* ${entItemsList.join(', ')}\n`;
+            }
+
+            const waUrl = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(msg)}`;
+            window.open(waUrl, '_blank');
+          };
+
+          return (
+            <div className="min-h-screen bg-[#fafafa] font-sans text-zinc-800 pb-24">
+              
+              {/* Top Navigation Bar Style */}
+              <div className="bg-white border-b border-zinc-200 sticky top-0 z-50 px-4 h-14 flex items-center justify-between max-w-lg mx-auto sm:max-w-full">
+                <div className="flex items-center gap-2 text-xl font-bold font-serif italic tracking-tight">
+                  Villa dos Anjos
+                </div>
+                <div className="flex items-center gap-4 text-2xl text-zinc-800">
+                  <i className="fa-regular fa-square-plus"></i>
+                  <i className="fa-solid fa-bars"></i>
+                </div>
+              </div>
+
+              {/* Feed Container */}
+              <div className="max-w-5xl mx-auto pt-6 px-0 sm:px-4 grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                
+                {/* Coluna do Feed (Esquerda) */}
+                <div className="lg:col-span-7 xl:col-span-8 flex flex-col items-center">
+                  
+                  {/* Mensagem de Erro Flutuante */}
+                  {error && (
+                    <div className="fixed top-16 left-1/2 transform -translate-x-1/2 z-50 w-11/12 max-w-md bg-red-600 text-white p-4 rounded-xl shadow-2xl flex items-center gap-3 animate-fade-in font-medium text-sm">
+                      <i className="fa-solid fa-circle-exclamation text-lg"></i>
+                      {error}
+                    </div>
+                  )}
+
+                  {/* POST 1: Dados do Cliente */}
+                  <InstagramPost 
+                    avatar={AVATAR_URL}
+                    username="villadosanjos"
+                    location="Vitória da Conquista, BA"
+                    images={[
+                      "https://images.unsplash.com/photo-1519225421980-715cb0215aed?auto=format&fit=crop&w=800&q=80",
+                      "https://images.unsplash.com/photo-1511556820780-d912e42b4980?auto=format&fit=crop&w=800&q=80"
+                    ]}
+                    hideAction={true}
+                    description={<span>Bem-vindo à Villa dos Anjos! 🌟 Para começarmos a planejar o seu sonho e enviar um orçamento personalizado, preencha os detalhes básicos do seu evento abaixo. Deslize para baixo para montar seu pacote!</span>}
+                  >
+                    <div className="space-y-4">
+                      <div className="flex items-center border-b border-zinc-300 py-2">
+                        <i className="fa-regular fa-user text-zinc-400 w-6 text-center"></i>
+                        <input type="text" value={clientName} onChange={(e) => setClientName(e.target.value)} placeholder="Seu nome completo" className="appearance-none bg-transparent border-none w-full text-zinc-700 mr-3 py-1 px-2 leading-tight focus:outline-none" />
+                      </div>
+                      <div className="flex items-center border-b border-zinc-300 py-2">
+                        <i className="fa-brands fa-whatsapp text-zinc-400 w-6 text-center"></i>
+                        <input type="tel" value={clientPhone} onChange={(e) => setClientPhone(e.target.value)} placeholder="WhatsApp com DDD" className="appearance-none bg-transparent border-none w-full text-zinc-700 mr-3 py-1 px-2 leading-tight focus:outline-none" />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4 pt-2">
+                        <div>
+                          <label className="text-xs text-zinc-500 font-semibold mb-1 block">Data Desejada</label>
+                          <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="w-full bg-zinc-100 rounded-lg p-2 text-sm text-zinc-700 border-none focus:ring-2 focus:ring-blue-500 outline-none" />
+                        </div>
+                        <div>
+                          <label className="text-xs text-zinc-500 font-semibold mb-1 block">Convidados</label>
+                          <input type="number" min={MINIMUM_GUESTS} value={guests} onChange={(e) => setGuests(Math.max(MINIMUM_GUESTS, parseInt(e.target.value) || 0))} className="w-full bg-zinc-100 rounded-lg p-2 text-sm text-zinc-700 border-none focus:ring-2 focus:ring-blue-500 outline-none font-bold" />
+                        </div>
+                      </div>
+                    </div>
+                  </InstagramPost>
+
+                  {/* POST 2: Decoração */}
+                  <InstagramPost 
+                    avatar={AVATAR_URL}
+                    username="villadosanjos"
+                    location="Decoração e Cenografia"
+                    images={[
+                      "https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&w=800&q=80",
+                      "https://images.unsplash.com/photo-1530103862676-de3c9de59f9e?auto=format&fit=crop&w=800&q=80",
+                      "https://images.unsplash.com/photo-1464366400600-7168b8af9bc3?auto=format&fit=crop&w=800&q=80"
+                    ]}
+                    isOpen={hasDecoration}
+                    onToggle={() => setHasDecoration(!hasDecoration)}
+                    actionText="Detalhar a Decoração"
+                    description={<span>Transformamos espaços em cenários inesquecíveis. ✨ Flores, luzes e detalhes pensados exclusivamente para você.</span>}
+                  >
+                    <div className="space-y-4 bg-zinc-50 p-3 rounded-lg border border-zinc-100">
+                      <div>
+                        <label className="block text-xs font-bold text-zinc-500 mb-2 uppercase tracking-wide">Qual será a celebração?</label>
+                        <div className="flex overflow-x-auto gap-2 pb-2 no-scrollbar">
+                          {DECORATION_TYPES.map(t => (
+                            <button key={t.id} onClick={() => setDecorationType(t.id)} className={`whitespace-nowrap px-4 py-2 rounded-full text-sm font-medium transition-all border ${decorationType === t.id ? 'bg-zinc-900 text-white border-zinc-900' : 'bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-100'}`}>
+                              {t.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-zinc-500 mb-2 uppercase tracking-wide">Padrão da Decoração</label>
+                        <div className="grid grid-cols-3 gap-2">
+                          {DECORATION_LEVELS.map(l => (
+                            <button key={l} onClick={() => setDecorationLevel(l)} className={`py-2 px-1 text-xs sm:text-sm font-medium rounded-lg border transition-all ${decorationLevel === l ? 'bg-blue-50 border-blue-500 text-blue-700' : 'bg-white border-zinc-200 text-zinc-600'}`}>
+                              {l}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {decorationType === 'Casamento' && (
+                        <div className="pt-2">
+                          <label className="block text-xs font-bold text-zinc-500 mb-2 uppercase tracking-wide">Decoração da Igreja?</label>
+                          <select value={churchDecoration} onChange={(e) => setChurchDecoration(e.target.value)} className="w-full p-2.5 bg-white border border-zinc-200 rounded-lg text-sm text-zinc-700 outline-none focus:ring-2 focus:ring-blue-500">
+                            {CHURCH_DECORATION_OPTIONS.map(lvl => <option key={lvl} value={lvl}>{lvl}</option>)}
+                          </select>
+                        </div>
+                      )}
+                    </div>
+                  </InstagramPost>
+
+                  {/* POST 3: Buffet */}
+                  <InstagramPost 
+                    avatar={AVATAR_URL}
+                    username="villadosanjos"
+                    location="Alta Gastronomia"
+                    images={[
+                      "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=800&q=80",
+                      "https://images.unsplash.com/photo-1555126634-323283e090fa?auto=format&fit=crop&w=800&q=80",
+                      "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?auto=format&fit=crop&w=800&q=80"
+                    ]}
+                    isOpen={hasBuffet}
+                    onToggle={() => setHasBuffet(!hasBuffet)}
+                    actionText="Montar o seu Buffet"
+                    description={<span>Sabor que fica na memória. 🍽️ Nosso menu é assinado por chefs experientes, com opções que vão do clássico ao contemporâneo.</span>}
+                  >
+                    <div className="space-y-5 bg-zinc-50 p-3 rounded-lg border border-zinc-100">
+                      
+                      <div>
+                        <label className="block text-xs font-bold text-zinc-500 mb-3 uppercase tracking-wide"><i className="fa-solid fa-bell-concierge mr-1"></i> Tipos de Buffet</label>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {BUFFET_FIXED.map(item => (
+                            <label key={item.id} className={`flex items-center p-2.5 rounded-lg border cursor-pointer transition-all ${buffetFixedSelections[item.id] ? 'bg-blue-50 border-blue-300' : 'bg-white border-zinc-200 hover:bg-zinc-50'}`}>
+                              <input 
+                                type="checkbox" 
+                                checked={!!buffetFixedSelections[item.id]} 
+                                onChange={() => setBuffetFixedSelections(prev => ({...prev, [item.id]: !prev[item.id]}))} 
+                                className="w-5 h-5 accent-blue-500 mr-3 cursor-pointer shrink-0" 
+                              />
+                              <span className="text-sm font-medium text-zinc-700">{item.label}</span>
+                            </label>
+                          ))}
+                          <label className={`flex items-center p-2.5 rounded-lg border cursor-pointer transition-all ${hasCake ? 'bg-pink-50 border-pink-300' : 'bg-white border-zinc-200 hover:bg-zinc-50'}`}>
+                              <input 
+                                type="checkbox" 
+                                checked={hasCake} 
+                                onChange={() => setHasCake(!hasCake)} 
+                                className="w-5 h-5 accent-pink-500 mr-3 cursor-pointer shrink-0" 
+                              />
+                              <span className="text-sm font-medium text-zinc-700">Bolo Cenográfico + Bolo de Corte</span>
+                          </label>
+                        </div>
+                      </div>
+                      
+                      <div className="pt-2 border-t border-zinc-200">
+                        <label className="block text-xs font-bold text-zinc-500 mb-3 uppercase tracking-wide"><i className="fa-solid fa-utensils mr-1"></i> Itens Personalizados - Quantidade para cada Convidado</label>
+                        <div className="grid grid-cols-1 gap-2">
+                          {BUFFET_VARIABLE.map(item => {
+                            const sel = buffetVarSelections[item.id];
+                            return (
+                              <div key={item.id} className={`flex items-center justify-between p-2.5 rounded-lg border transition-all ${sel?.selected ? 'bg-blue-50 border-blue-300' : 'bg-white border-zinc-200 hover:bg-zinc-50'}`}>
+                                <label className="flex items-center cursor-pointer flex-1">
+                                  <input 
+                                    type="checkbox" 
+                                    checked={!!sel?.selected} 
+                                    onChange={() => setBuffetVarSelections(prev => ({...prev, [item.id]: {selected: !prev[item.id]?.selected, qty: prev[item.id]?.qty || 1}}))} 
+                                    className="w-5 h-5 accent-blue-500 mr-3 cursor-pointer shrink-0" 
+                                  />
+                                  <span className="text-sm font-medium text-zinc-700">{item.label}</span>
+                                </label>
+                                {sel?.selected && (
+                                  <div className="flex items-center gap-2 bg-white px-2 py-1 rounded-md border border-zinc-200 shadow-sm ml-2">
+                                    <span className="text-[10px] text-zinc-400 font-bold uppercase">Qtd:</span>
+                                    <input type="number" min="1" value={sel.qty} onChange={(e) => setBuffetVarSelections(prev => ({...prev, [item.id]: {...prev[item.id], qty: parseInt(e.target.value) || 1}}))} className="w-10 text-sm font-bold text-center bg-transparent outline-none text-zinc-800" />
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                    </div>
+                  </InstagramPost>
+
+                  {/* POST 4: Bebidas */}
+                  <InstagramPost 
+                    avatar={AVATAR_URL}
+                    username="villadosanjos"
+                    location="Bares & Drinks"
+                    images={[
+                      "https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?auto=format&fit=crop&w=800&q=80",
+                      "https://images.unsplash.com/photo-1536935338788-846bb9981813?auto=format&fit=crop&w=800&q=80",
+                      "https://images.unsplash.com/photo-1499638673689-79a0b5115d87?auto=format&fit=crop&w=800&q=80"
+                    ]}
+                    isOpen={hasBeverages}
+                    onToggle={() => setHasBeverages(!hasBeverages)}
+                    actionText="Definir as Bebidas"
+                    description={<span>Um brinde aos bons momentos! 🥂 Nossa coquetelaria traz drinks exclusivos e bebidas geladas durante todo o evento.</span>}
+                  >
+                     <div className="space-y-4 bg-zinc-50 p-3 rounded-lg border border-zinc-100">
+                        <div>
+                          <label className="block text-xs font-bold text-zinc-500 mb-2 uppercase tracking-wide">Plano de Bebidas Base</label>
+                          <div className="flex flex-col sm:flex-row gap-2">
+                            {BEVERAGE_TYPES.map(b => (
+                              <button key={b.id} onClick={() => setBeverageSelection(b.id)} className={`flex-1 py-2.5 px-2 text-sm font-medium rounded-lg border transition-all ${beverageSelection === b.id ? 'bg-blue-50 border-blue-500 text-blue-700' : 'bg-white border-zinc-200 text-zinc-600 hover:bg-zinc-50'}`}>
+                                {b.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="pt-2 border-t border-zinc-200">
+                          <label className="block text-xs font-bold text-zinc-500 mb-2 uppercase tracking-wide">Adicionar Bar de Drinks?</label>
+                          <select value={drinkSelection} onChange={(e) => setDrinkSelection(e.target.value)} className="w-full p-2.5 bg-white border border-zinc-200 rounded-lg text-sm text-zinc-700 outline-none focus:ring-2 focus:ring-blue-500">
+                            {DRINK_TYPES.map(d => <option key={d.id} value={d.id}>{d.label}</option>)}
+                          </select>
+                        </div>
+                      </div>
+                  </InstagramPost>
+
+                  {/* POST 5: Entretenimento */}
+                  <InstagramPost 
+                    avatar={AVATAR_URL}
+                    username="villadosanjos"
+                    location="Pista de Dança"
+                    images={[
+                      "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&w=800&q=80",
+                      "https://images.unsplash.com/photo-1516873240891-4bf014598ab4?auto=format&fit=crop&w=800&q=80",
+                      "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=800&q=80"
+                    ]}
+                    isOpen={hasEntertainment}
+                    onToggle={() => setHasEntertainment(!hasEntertainment)}
+                    actionText="Escolher a Diversão"
+                    description={<span>A animação é por nossa conta! 🎶 Bandas, DJs, Iluminação Cênica e muito mais para não deixar ninguém parado.</span>}
+                  >
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 bg-zinc-50 p-3 rounded-lg border border-zinc-100">
+                      {ENTERTAINMENT_OPTIONS.map(item => (
+                        <label key={item.id} className={`flex items-center p-2.5 rounded-lg border cursor-pointer transition-all ${entertainmentSelections[item.id] ? 'bg-purple-50 border-purple-300' : 'bg-white border-zinc-200 hover:bg-zinc-50'}`}>
+                          <input 
+                            type="checkbox" 
+                            checked={!!entertainmentSelections[item.id]} 
+                            onChange={() => setEntertainmentSelections(prev => ({...prev, [item.id]: !prev[item.id]}))} 
+                            className="w-5 h-5 accent-purple-500 mr-3 cursor-pointer shrink-0" 
+                          />
+                          <span className="text-sm font-medium text-zinc-700">{item.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </InstagramPost>
+
+                </div>
+
+                {/* Coluna do Resumo (Direita / Desktop) */}
+                <div className="hidden lg:block lg:col-span-5 xl:col-span-4 sticky top-20">
+                  <div className="bg-white rounded-xl shadow-lg border border-zinc-200 overflow-hidden">
+                    <div className="bg-zinc-900 text-white p-4 text-center font-bold uppercase tracking-widest text-sm flex items-center justify-center gap-2">
+                      <i className="fa-regular fa-clipboard"></i> Resumo do Pedido
+                    </div>
+                    
+                    <div className="p-5 space-y-4">
+                      <div className="flex justify-between items-center text-sm border-b border-zinc-100 pb-3">
+                        <span className="text-zinc-500"><i className="fa-regular fa-calendar mr-1"></i> Data:</span> 
+                        <span className="font-bold text-zinc-800">{formatDateBR(selectedDate)}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-sm border-b border-zinc-100 pb-3">
+                        <span className="text-zinc-500"><i className="fa-solid fa-user-group mr-1"></i> Convidados:</span> 
+                        <span className="font-bold text-zinc-800">{guests}</span>
+                      </div>
+                      
+                      <div className="pt-2">
+                        <h3 className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest mb-3">Serviços Selecionados</h3>
+                        <div className="space-y-2.5">
+                          {hasDecoration ? 
+                            <p className="text-sm flex items-center gap-2 font-medium text-zinc-700"><i className="fa-solid fa-check-circle text-green-500"></i> Decoração {decorationType}</p> 
+                            : <p className="text-sm text-zinc-400 italic line-through">Decoração</p>}
+                          
+                          {hasBuffet ? 
+                            <p className="text-sm flex items-center gap-2 font-medium text-zinc-700"><i className="fa-solid fa-check-circle text-green-500"></i> Buffet ({buffetItemsList.length} itens)</p> 
+                            : <p className="text-sm text-zinc-400 italic line-through">Gastronomia</p>}
+                          
+                          {hasBeverages ? 
+                            <p className="text-sm flex items-center gap-2 font-medium text-zinc-700"><i className="fa-solid fa-check-circle text-green-500"></i> Bar & Bebidas</p> 
+                            : <p className="text-sm text-zinc-400 italic line-through">Bebidas</p>}
+                            
+                          {hasEntertainment ? 
+                            <p className="text-sm flex items-center gap-2 font-medium text-zinc-700"><i className="fa-solid fa-check-circle text-green-500"></i> Entretenimento ({entItemsList.length})</p> 
+                            : <p className="text-sm text-zinc-400 italic line-through">Música</p>}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="p-5 bg-zinc-50 border-t border-zinc-200">
+                      <button onClick={handleSendWhatsApp} className="w-full bg-[#25D366] hover:bg-[#1ebd5b] text-white font-bold py-3.5 rounded-lg shadow-md transition-all flex items-center justify-center gap-2 transform hover:scale-[1.02]">
+                        <i className="fa-brands fa-whatsapp text-xl"></i> Receber Orçamento
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Botão Fixo Mobile para Enviar */}
+              <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-zinc-200 p-4 shadow-[0_-10px_20px_-10px_rgba(0,0,0,0.1)] z-40">
+                <button onClick={handleSendWhatsApp} className="w-full max-w-lg mx-auto bg-[#25D366] active:bg-[#1ebd5b] text-white font-bold py-3.5 rounded-xl shadow-lg flex items-center justify-center gap-2 text-lg">
+                  <i className="fa-brands fa-whatsapp text-xl"></i> Receber Orçamento Exato
+                </button>
+              </div>
+
+            </div>
+          );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
