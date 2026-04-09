@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel Administrativo - Villa dos Anjos</title>
+    <!-- Tailwind CSS para o visual -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Ícones FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Bibliotecas React e Babel -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+      @media print {
+        @page { margin: 0; }
+        body { margin: 1.5cm; background-color: white !important; }
+        .print\:hidden { display: none !important; }
+        .print\:block { display: block !important; }
+        .shadow-xl, .shadow-sm { box-shadow: none !important; }
+      }
+      .transition-all { transition: all 0.3s ease; }
+    </style>
+</head>
+<body class="bg-zinc-50">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useMemo, useRef } = React;
+
+        // =====================================================================
+        // CONFIGURAÇÕES GERAIS E PRECIFICAÇÃO (ADMIN)
+        // =====================================================================
+        const WHATSAPP_NUMBER = "5577988763286"; 
+
+        const FIXED_HOLIDAYS = [
+          '01-01', '04-21', '05-01', '07-02', '08-15', '09-07', '10-12', '11-02', '11-09', '11-15', '12-25'
+        ];
+
+        const VARIABLE_HOLIDAYS = {
+          2024: ['2024-02-12', '2024-02-13', '2024-03-29', '2024-05-30'],
+          2025: ['2025-03-03', '2025-03-04', '2025-04-18', '2025-06-19'],
+          2026: ['2026-02-16', '2026-02-17', '2026-04-03', '2026-06-04'],
+          2027: ['2027-02-08', '2027-02-09', '2027-03-26', '2027-05-27']
+        };
+
+        const isHoliday = (dateString) => {
+          if (!dateString) return false;
+          const [y, m, d] = dateString.split('-');
+          const md = `${m}-${d}`;
+          return FIXED_HOLIDAYS.includes(md) || (VARIABLE_HOLIDAYS[y] && VARIABLE_HOLIDAYS[y].includes(dateString));
+        };
+
+        const isBusinessDay = (dateString) => {
+          const [y, m, d] = dateString.split('-');
+          const date = new Date(y, m - 1, d);
+          const day = date.getDay();
+          return (day !== 0 && day !== 6) && !isHoliday(dateString);
+        };
+
+        const getNextDayString = (dateString) => {
+          const [y, m, d] = dateString.split('-');
+          const date = new Date(y, m - 1, d);
+          date.setDate(date.getDate() + 1);
+          return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
+        };
+
+        const DECORATION_TYPES = [
+          { id: 'Casamento', label: 'Casamento', perGuest: { 'Simples': 15, 'Completa': 25, 'Luxo': 35 } },
+          { id: 'Aniversário', label: 'Aniversário', perGuest: { 'Simples': 10, 'Completa': 18, 'Luxo': 25 } },
+          { id: 'Infantil', label: 'Infantil', perGuest: { 'Simples': 10, 'Completa': 18, 'Luxo': 25 } },
+          { id: 'Debutante', label: 'Debutante', perGuest: { 'Simples': 13, 'Completa': 20, 'Luxo': 28 } },
+          { id: 'Formatura Dia', label: 'Formatura Dia', perGuest: { 'Simples': 10, 'Completa': 18, 'Luxo': 25 } },
+          { id: 'Formatura Noite', label: 'Formatura Noite', perGuest: { 'Simples': 13, 'Completa': 20, 'Luxo': 28 } },
+          { id: 'Confraternização', label: 'Confraternização', perGuest: { 'Simples': 10, 'Completa': 15, 'Luxo': 20 } },
+          { id: 'Corporativo', label: 'Corporativo', perGuest: { 'Simples': 5, 'Completa': 10, 'Luxo': 18 } }
+        ];
+
+        const DECORATION_LEVELS = ['Simples', 'Completa', 'Luxo'];
+        const FIXED_DECORATION_COSTS = { 'Simples': 1000, 'Completa': 1200, 'Luxo': 1500 };
+        const CHURCH_DECORATION_COSTS = { 'Não': 0, 'Simples': 1500, 'Completa': 2500, 'Luxo': 3500, 'Super Luxo': 5000 };
+
+        const BUFFET_FIXED = [
+          { id: 'self_service', label: 'Buffet Self Service', price: 35 },
+          { id: 'asiatico', label: 'Buffet Asiático', price: 35 },
+          { id: 'degustacao_premium', label: 'Mesa Degustação Premium', price: 30 },
+          { id: 'degustacao_standard', label: 'Mesa Degustação Standard', price: 25 },
+          { id: 'ilha_massas', label: 'Ilha de Massas', price: 25 },
+          { id: 'mexicano', label: 'Buffet Mexicano', price: 25 },
+          { id: 'mesa_frios', label: 'Mesa de Frios', price: 20 },
+          { id: 'mini_acarajes', label: 'Mini Acarajés', price: 15 },
+          { id: 'piquenique_infantil', label: 'Piquenique Infantil', price: 15 },
+        ];
+
+        const BUFFET_VARIABLE = [
+          { id: 'salgados_trad', label: 'Salgados Tradicionais', price: 2.2 },
+          { id: 'salgados_finos', label: 'Salgados Finos', price: 2.7 },
+          { id: 'doces_trad', label: 'Doces Tradicionais', price: 2.2 },
+          { id: 'doces_finos', label: 'Doces Finos', price: 2.7 },
+          { id: 'canapes', label: 'Canapés', price: 3.5 },
+          { id: 'mini_empratados', label: 'Mini Empratados', price: 7 },
+          { id: 'espetinhos', label: 'Espetinhos Churrasco', price: 8 },
+          { id: 'mini_fast_food', label: 'Mini Fast Food', price: 7 },
+        ];
+
+        const BEVERAGE_TYPES = [
+          { id: 'sem_alcool', label: 'Sem Álcool', price: 8 },
+          { id: 'com_alcool', label: 'Com Álcool', price: 15 },
+          { id: 'com_alcool_premium', label: 'Com Álcool Premium', price: 22 },
+        ];
+
+        const DRINK_TYPES = [
+          { id: 'sem_drinks', label: 'Sem Drinks', price: 0 },
+          { id: 'drinks_sem_alcool', label: 'Drinks Sem Álcool', price: 20 },
+          { id: 'drinks_standard', label: 'Drinks Simples', price: 20 },
+          { id: 'drinks_premium', label: 'Drinks Premium', price: 25 },
+          { id: 'drinks_luxo', label: 'Drinks Luxo', price: 30 },
+        ];
+
+        const SERVICES_OPTIONS = [
+          { id: 'seguranca', label: 'Portaria e Segurança', price: 180 },
+          { id: 'limpeza', label: 'Limpeza', price: 150 },
+          { id: 'copa', label: 'Copa', price: 150 },
+          { id: 'cozinha', label: 'Cozinha', price: 200 },
+          { id: 'garcons', label: 'Garçons', price: 180 },
+          { id: 'maitre', label: 'Maître', price: 250 },
+          { id: 'cerimonial', label: 'Cerimonial', price: 350 },
+          { id: 'mestre_cerimonia', label: 'Mestre de Cerimônia', price: 500 },
+          { id: 'animador', label: 'Animador Infantil', price: 350 },
+        ];
+
+        const ENTERTAINMENT_OPTIONS = [
+          { id: 'son_standard', label: 'Sonorização Simples', price: 600 },
+          { id: 'son_prof', label: 'Sonorização Profissional', price: 1500 },
+          { id: 'voz_violao', label: 'Voz e Violão', price: 800 },
+          { id: 'banda_standard', label: 'Banda Standard', price: 1800 },
+          { id: 'banda_premium', label: 'Banda Premium', price: 2500 },
+          { id: 'banda_luxo', label: 'Banda Luxo', price: 3000 },
+          { id: 'banda_inst', label: 'Banda Instrumental', price: 1600 },
+          { id: 'dj_standard', label: 'DJ Standard', price: 600 },
+          { id: 'dj_premium', label: 'DJ Premium', price: 1500 },
+          { id: 'dj_luxo', label: 'DJ Luxo', price: 2000 },
+          { id: 'pista_led', label: 'Pista de LED', price: 2000 },
+          { id: 'brinquedos', label: 'Brinquedos & Guloseimas', price: 1000 },
+        ];
+
+        function App() {
+          const today = new Date().toLocaleDateString('en-CA');
+          
+          const [error, setError] = useState('');
+          const [clientName, setClientName] = useState('');
+          const [clientPhone, setClientPhone] = useState('');
+          const [guests, setGuests] = useState(30);
+          const [selectedDate, setSelectedDate] = useState(today);
+          const [includeServiceTax, setIncludeServiceTax] = useState(false);
+          
+          const [hasDecoration, setHasDecoration] = useState(false);
+          const [decorationType, setDecorationType] = useState('Casamento');
+          const [decorationLevel, setDecorationLevel] = useState('Simples');
+          const [churchDecoration, setChurchDecoration] = useState('Não');
+
+          const [hasBuffet, setHasBuffet] = useState(false);
+          const [buffetFixedSelections, setBuffetFixedSelections] = useState({});
+          const [buffetVarSelections, setBuffetVarSelections] = useState({});
+          const [hasCake, setHasCake] = useState(false);
+          
+          const [hasBeverages, setHasBeverages] = useState(false);
+          const [beverageSelection, setBeverageSelection] = useState('sem_alcool');
+          const [drinkSelection, setDrinkSelection] = useState('sem_drinks');
+          
+          const [hasServices, setHasServices] = useState(false);
+          const [servicesSelections, setServicesSelections] = useState({});
+          
+          const [hasEntertainment, setHasEntertainment] = useState(false);
+          const [entertainmentSelections, setEntertainmentSelections] = useState({});
+
+          const fileInputRef = useRef(null);
+
+          const COST_PER_GUEST = 10;
+          const MINIMUM_GUESTS = 30;
+          const taxMultiplier = includeServiceTax ? 1.1 : 1;
+
+          const formatCurrency = (value) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+          const formatDateBR = (dateString) => {
+            if (!dateString) return '';
+            const [y, m, d] = dateString.split('-');
+            return `${d}/${m}/${y}`;
+          };
+
+          // Regras de Dia da Semana e Feriado
+          const { baseCost, ruleName } = useMemo(() => {
+            if (!selectedDate) return { baseCost: 1500, ruleName: "Selecione uma data" };
+            const [y, m, d] = selectedDate.split('-');
+            const dateObj = new Date(y, m - 1, d);
+            const dayOfWeek = dateObj.getDay();
+            const isHol = isHoliday(selectedDate);
+            const nextDateStr = getNextDayString(selectedDate);
+            const nextDayIsBusiness = isBusinessDay(nextDateStr);
+            const nextDayIsHol = isHoliday(nextDateStr);
+
+            if (dayOfWeek === 6) return { baseCost: 3000, ruleName: "Sábado" };
+            if (dayOfWeek === 0 && (!nextDayIsBusiness || nextDayIsHol)) return { baseCost: 3000, ruleName: "Domingo (Véspera de feriado)" };
+            if (isHol && !nextDayIsBusiness) return { baseCost: 3000, ruleName: "Feriado prolongado" };
+            if (dayOfWeek === 5 || dayOfWeek === 0) return { baseCost: 2300, ruleName: "Sexta ou Domingo" };
+            if (isHol || nextDayIsHol) return { baseCost: 2300, ruleName: "Feriado ou Véspera" };
+            return { baseCost: 1500, ruleName: "Segunda a Quinta" };
+          }, [selectedDate]);
+
+          // Cálculos de custos
+          const effectiveBaseCost = baseCost * taxMultiplier;
+          const guestsCost = guests * COST_PER_GUEST * taxMultiplier;
+          
+          let decorationCost = 0;
+          let churchDecoCost = 0;
+          if (hasDecoration) {
+            const selectedType = DECORATION_TYPES.find(d => d.id === decorationType) || DECORATION_TYPES[0];
+            decorationCost = (FIXED_DECORATION_COSTS[decorationLevel] + (selectedType.perGuest[decorationLevel] * guests)) * taxMultiplier;
+            if (decorationType === 'Casamento') churchDecoCost = CHURCH_DECORATION_COSTS[churchDecoration] * taxMultiplier;
+          }
+
+          let buffetCost = 0;
+          const buffetItemsList = [];
+          if (hasBuffet) {
+            BUFFET_FIXED.forEach(item => {
+              if (buffetFixedSelections[item.id]) {
+                buffetCost += item.price * taxMultiplier * guests;
+                buffetItemsList.push(item.label);
+              }
+            });
+            BUFFET_VARIABLE.forEach(item => {
+              const sel = buffetVarSelections[item.id];
+              if (sel?.selected) {
+                buffetCost += item.price * taxMultiplier * (sel.qty || 1) * guests;
+                buffetItemsList.push(`${item.label} (x${sel.qty})`);
+              }
+            });
+            if (hasCake) {
+              buffetCost += (350 + (7 * guests)) * taxMultiplier;
+              buffetItemsList.push('Bolo Villa dos Anjos');
+            }
+          }
+
+          let beveragesCost = 0;
+          if (hasBeverages) {
+            const bev = BEVERAGE_TYPES.find(b => b.id === beverageSelection);
+            const drk = DRINK_TYPES.find(d => d.id === drinkSelection);
+            if (bev) beveragesCost += bev.price * taxMultiplier * guests;
+            if (drk) beveragesCost += drk.price * taxMultiplier * guests;
+          }
+
+          let servicesCost = 0;
+          const servicesItemsList = [];
+          if (hasServices) {
+            SERVICES_OPTIONS.forEach(item => {
+              const sel = servicesSelections[item.id];
+              if (sel?.selected) {
+                servicesCost += item.price * taxMultiplier * (sel.qty || 1);
+                servicesItemsList.push(`${item.label} (x${sel.qty})`);
+              }
+            });
+          }
+
+          let entertainmentCost = 0;
+          const entItemsList = [];
+          if (hasEntertainment) {
+            ENTERTAINMENT_OPTIONS.forEach(item => {
+              if (entertainmentSelections[item.id]) {
+                entertainmentCost += item.price * taxMultiplier;
+                entItemsList.push(item.label);
+              }
+            });
+          }
+
+          const totalCost = effectiveBaseCost + guestsCost + decorationCost + churchDecoCost + buffetCost + beveragesCost + servicesCost + entertainmentCost;
+
+          // Processa o arquivo lido (usado tanto pelo novo método quanto pelo antigo)
+          const processFile = (file) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    if(data.clientName !== undefined) setClientName(data.clientName);
+                    if(data.clientPhone !== undefined) setClientPhone(data.clientPhone);
+                    if(data.guests !== undefined) setGuests(data.guests);
+                    if(data.selectedDate !== undefined) setSelectedDate(data.selectedDate);
+                    if(data.includeServiceTax !== undefined) setIncludeServiceTax(data.includeServiceTax);
+                    
+                    if(data.hasDecoration !== undefined) setHasDecoration(data.hasDecoration);
+                    if(data.decorationType !== undefined) setDecorationType(data.decorationType);
+                    if(data.decorationLevel !== undefined) setDecorationLevel(data.decorationLevel);
+                    if(data.churchDecoration !== undefined) setChurchDecoration(data.churchDecoration);
+                    
+                    if(data.hasBuffet !== undefined) setHasBuffet(data.hasBuffet);
+                    if(data.buffetFixedSelections !== undefined) setBuffetFixedSelections(data.buffetFixedSelections);
+                    if(data.buffetVarSelections !== undefined) setBuffetVarSelections(data.buffetVarSelections);
+                    if(data.hasCake !== undefined) setHasCake(data.hasCake);
+                    
+                    if(data.hasBeverages !== undefined) setHasBeverages(data.hasBeverages);
+                    if(data.beverageSelection !== undefined) setBeverageSelection(data.beverageSelection);
+                    if(data.drinkSelection !== undefined) setDrinkSelection(data.drinkSelection);
+                    
+                    if(data.hasServices !== undefined) setHasServices(data.hasServices);
+                    if(data.servicesSelections !== undefined) setServicesSelections(data.servicesSelections);
+                    
+                    if(data.hasEntertainment !== undefined) setHasEntertainment(data.hasEntertainment);
+                    if(data.entertainmentSelections !== undefined) setEntertainmentSelections(data.entertainmentSelections);
+                    
+                    // Mostra mensagem de sucesso temporária (reaproveitando o state de erro)
+                    setError("✅ Orçamento carregado com sucesso!");
+                    setTimeout(() => setError(''), 3000);
+                } catch (err) {
+                    setError("Erro ao ler o arquivo. Certifique-se de que é um arquivo JSON válido de orçamento.");
+                    setTimeout(() => setError(''), 4000);
+                }
+            };
+            reader.readAsText(file);
+          };
+
+          const handleSaveBudget = async () => {
+            const budgetData = {
+              clientName, clientPhone, guests, selectedDate, includeServiceTax,
+              hasDecoration, decorationType, decorationLevel, churchDecoration,
+              hasBuffet, buffetFixedSelections, buffetVarSelections, hasCake,
+              hasBeverages, beverageSelection, drinkSelection,
+              hasServices, servicesSelections,
+              hasEntertainment, entertainmentSelections
+            };
+            
+            const jsonString = JSON.stringify(budgetData, null, 2);
+            const safeName = clientName ? clientName.replace(/\s+/g, '_') : 'Cliente';
+            const safePhone = clientPhone ? clientPhone.replace(/\D/g, '') : 'SemNumero';
+            const fileName = `Orcamento_${safeName}_${safePhone}.json`;
+            
+            try {
+              // Tenta usar a API moderna do sistema de arquivos (Abre a janela permitindo escolher a pasta)
+              if ('showSaveFilePicker' in window) {
+                const handle = await window.showSaveFilePicker({
+                  suggestedName: fileName,
+                  types: [{
+                    description: 'Arquivo de Orçamento JSON',
+                    accept: {'application/json': ['.json']},
+                  }],
+                });
+                const writable = await handle.createWritable();
+                await writable.write(jsonString);
+                await writable.close();
+                
+                setError("✅ Orçamento salvo com sucesso na sua pasta!");
+                setTimeout(() => setError(''), 3000);
+              } else {
+                // Fallback para navegadores antigos (faz o download normal)
+                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(jsonString);
+                const downloadAnchorNode = document.createElement('a');
+                downloadAnchorNode.setAttribute("href", dataStr);
+                downloadAnchorNode.setAttribute("download", fileName);
+                document.body.appendChild(downloadAnchorNode);
+                downloadAnchorNode.click();
+                downloadAnchorNode.remove();
+              }
+            } catch (err) {
+              // Ignora erro se o usuário apenas fechou a janela
+              if (err.name !== 'AbortError') {
+                setError("Erro ao salvar o arquivo.");
+                setTimeout(() => setError(''), 3000);
+              }
+            }
+          };
+
+          const handleImportClick = async () => {
+            try {
+              // Tenta usar a API moderna para abrir a mesma pasta
+              if ('showOpenFilePicker' in window) {
+                const [fileHandle] = await window.showOpenFilePicker({
+                  types: [{
+                    description: 'Arquivo de Orçamento JSON',
+                    accept: {'application/json': ['.json']},
+                  }],
+                  multiple: false
+                });
+                const file = await fileHandle.getFile();
+                processFile(file);
+              } else {
+                // Fallback para input normal
+                if (fileInputRef.current) {
+                  fileInputRef.current.click();
+                }
+              }
+            } catch (err) {
+              if (err.name !== 'AbortError') {
+                setError("Erro ao abrir o arquivo.");
+                setTimeout(() => setError(''), 3000);
+              }
+            }
+          };
+
+          const handleFileUpload = (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+            processFile(file);
+            event.target.value = null; // reset input
+          };
+
+          return (
+            <div className="min-h-screen bg-zinc-50 p-4 md:p-8 font-sans text-zinc-800 print:bg-white print:p-0">
+              <div className="max-w-6xl mx-auto space-y-6">
+                
+                {/* Header */}
+                <header className="bg-zinc-900 rounded-3xl p-6 md:p-10 text-white shadow-xl flex flex-col md:flex-row items-center justify-between gap-6 border-b-4 border-amber-500 print:hidden">
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 bg-amber-500/20 rounded-2xl border border-amber-500/30">
+                      <i className="fa-solid fa-location-dot text-amber-500 text-3xl"></i>
+                    </div>
+                    <div>
+                      <h1 className="text-2xl md:text-4xl font-bold flex items-center gap-3">
+                        Villa dos Anjos
+                      </h1>
+                      <p className="text-amber-200/70 font-medium">Painel Administrativo de Orçamentos</p>
+                    </div>
+                  </div>
+                </header>
+
+                {error && (
+                  <div className={`border-l-4 p-4 rounded-xl flex items-center gap-3 animate-pulse print:hidden ${error.includes('✅') ? 'bg-green-50 border-green-500 text-green-800' : 'bg-red-50 border-red-500 text-red-800'}`}>
+                    <i className={`fa-solid ${error.includes('✅') ? 'fa-check-circle' : 'fa-circle-exclamation'} text-xl`}></i>
+                    <p className="font-semibold">{error}</p>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 print:block">
+                  
+                  {/* Formulário Coluna Esquerda */}
+                  <div className="lg:col-span-8 space-y-6 print:hidden">
+
+                    <section className="bg-white rounded-2xl p-6 shadow-sm border border-zinc-200">
+                      <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 text-zinc-800">
+                        <i className="fa-solid fa-circle-user text-amber-500"></i> Dados do Cliente
+                      </h2>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <input type="text" value={clientName} onChange={(e) => setClientName(e.target.value)} placeholder="Nome Completo" className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none" />
+                        <input type="tel" value={clientPhone} onChange={(e) => setClientPhone(e.target.value)} placeholder="WhatsApp com DDD" className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none" />
+                      </div>
+                    </section>
+                    
+                    <section className="bg-white rounded-2xl p-6 shadow-sm border border-zinc-200 grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <h2 className="text-lg font-semibold mb-4 flex items-center gap-2"><i className="fa-solid fa-calendar-days text-amber-500"></i> Data do Evento</h2>
+                        <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-amber-500" />
+                      </div>
+                      <div>
+                        <h2 className="text-lg font-semibold mb-4 flex items-center gap-2"><i className="fa-solid fa-users text-amber-500"></i> Qtd. de Convidados</h2>
+                        <input type="number" min={MINIMUM_GUESTS} value={guests} onChange={(e) => setGuests(Math.max(MINIMUM_GUESTS, parseInt(e.target.value) || 0))} className="w-full text-xl p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-amber-500 text-center font-bold" />
+                      </div>
+                    </section>
+
+                    {/* Decoração */}
+                    <section className="bg-white rounded-2xl p-6 shadow-sm border border-zinc-200">
+                      <h2 className="text-lg font-semibold mb-4 flex items-center gap-2"><i className="fa-solid fa-wand-magic-sparkles text-amber-500"></i> Serviço de Decoração</h2>
+                      <div className="flex gap-4 mb-4">
+                        <button onClick={() => setHasDecoration(false)} className={`flex-1 p-3 rounded-xl border transition-all ${!hasDecoration ? 'bg-amber-50 border-amber-500 text-amber-700 font-bold' : 'bg-zinc-50 border-zinc-200'}`}>Sem Decoração</button>
+                        <button onClick={() => setHasDecoration(true)} className={`flex-1 p-3 rounded-xl border transition-all ${hasDecoration ? 'bg-amber-50 border-amber-500 text-amber-700 font-bold' : 'bg-zinc-50 border-zinc-200'}`}>Incluir Decoração</button>
+                      </div>
+                      {hasDecoration && (
+                        <div className="space-y-4 pt-4 border-t">
+                          <label className="block text-sm font-medium text-zinc-500">Tipo de Celebração</label>
+                          <select value={decorationType} onChange={(e) => setDecorationType(e.target.value)} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl">
+                            {DECORATION_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+                          </select>
+                          <label className="block text-sm font-medium text-zinc-500">Padrão da Decoração</label>
+                          <div className="grid grid-cols-3 gap-2">
+                            {DECORATION_LEVELS.map(l => (
+                              <button key={l} onClick={() => setDecorationLevel(l)} className={`p-2 text-sm rounded-lg border transition-all ${decorationLevel === l ? 'bg-amber-50 border-amber-500 font-bold' : 'bg-zinc-50'}`}>{l}</button>
+                            ))}
+                          </div>
+                          {decorationType === 'Casamento' && (
+                            <div className="pt-2">
+                              <label className="block text-sm font-medium text-zinc-500 mb-1">Decoração da Igreja</label>
+                              <select value={churchDecoration} onChange={(e) => setChurchDecoration(e.target.value)} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl">
+                                {Object.keys(CHURCH_DECORATION_COSTS).map(lvl => <option key={lvl} value={lvl}>{lvl}</option>)}
+                              </select>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </section>
+
+                    {/* Buffet */}
+                    <section className="bg-white rounded-2xl p-6 shadow-sm border border-zinc-200">
+                      <h2 className="text-lg font-semibold mb-4 flex items-center gap-2"><i className="fa-solid fa-utensils text-amber-500"></i> Buffet e Gastronomia</h2>
+                      <div className="flex gap-4 mb-4">
+                        <button onClick={() => setHasBuffet(false)} className={`flex-1 p-3 rounded-xl border transition-all ${!hasBuffet ? 'bg-amber-50 border-amber-500 text-amber-700 font-bold' : 'bg-zinc-50 border-zinc-200'}`}>Sem Buffet</button>
+                        <button onClick={() => setHasBuffet(true)} className={`flex-1 p-3 rounded-xl border transition-all ${hasBuffet ? 'bg-amber-50 border-amber-500 text-amber-700 font-bold' : 'bg-zinc-50 border-zinc-200'}`}>Incluir Buffet</button>
+                      </div>
+                      {hasBuffet && (
+                        <div className="space-y-6 pt-4 border-t">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <h3 className="col-span-full text-xs font-bold text-zinc-400 uppercase tracking-wider">Itens Fixos / Mesa</h3>
+                            {BUFFET_FIXED.map(item => (
+                              <label key={item.id} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${buffetFixedSelections[item.id] ? 'bg-amber-50 border-amber-300' : 'bg-zinc-50 border-zinc-200'}`}>
+                                <input type="checkbox" checked={!!buffetFixedSelections[item.id]} onChange={() => setBuffetFixedSelections(prev => ({...prev, [item.id]: !prev[item.id]}))} className="w-5 h-5 accent-amber-500" />
+                                <span className="text-sm font-medium">{item.label}</span>
+                              </label>
+                            ))}
+                            <label className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${hasCake ? 'bg-amber-50 border-amber-300' : 'bg-zinc-50 border-zinc-200'}`}>
+                                <input type="checkbox" checked={hasCake} onChange={() => setHasCake(!hasCake)} className="w-5 h-5 accent-amber-500" />
+                                <span className="text-sm font-medium">Bolo Villa dos Anjos</span>
+                            </label>
+                          </div>
+                          
+                          <div className="grid grid-cols-1 gap-3">
+                            <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Itens Variáveis (Por Convidado)</h3>
+                            {BUFFET_VARIABLE.map(item => {
+                              const sel = buffetVarSelections[item.id];
+                              return (
+                                <div key={item.id} className={`flex items-center justify-between p-3 rounded-xl border transition-all ${sel?.selected ? 'bg-amber-50 border-amber-300' : 'bg-zinc-50 border-zinc-200'}`}>
+                                  <label className="flex items-center gap-3 cursor-pointer flex-1">
+                                    <input type="checkbox" checked={!!sel?.selected} onChange={() => setBuffetVarSelections(prev => ({...prev, [item.id]: {selected: !prev[item.id]?.selected, qty: prev[item.id]?.qty || 1}}))} className="w-5 h-5 accent-amber-500" />
+                                    <span className="text-sm font-medium">{item.label}</span>
+                                  </label>
+                                  {sel?.selected && (
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-[10px] text-zinc-400 font-bold">QTD:</span>
+                                      <input type="number" min="1" value={sel.qty} onChange={(e) => setBuffetVarSelections(prev => ({...prev, [item.id]: {...prev[item.id], qty: parseInt(e.target.value) || 1}}))} className="w-12 p-1 text-center border rounded-lg bg-white" />
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </section>
+
+                    {/* Bebidas */}
+                    <section className="bg-white rounded-2xl p-6 shadow-sm border border-zinc-200">
+                      <h2 className="text-lg font-semibold mb-4 flex items-center gap-2"><i className="fa-solid fa-wine-glass text-amber-500"></i> Bebidas e Coquetelaria</h2>
+                      <div className="flex gap-4 mb-4">
+                        <button onClick={() => setHasBeverages(false)} className={`flex-1 p-3 rounded-xl border transition-all ${!hasBeverages ? 'bg-amber-50 border-amber-500 text-amber-700 font-bold' : 'bg-zinc-50 border-zinc-200'}`}>Sem Bebidas</button>
+                        <button onClick={() => setHasBeverages(true)} className={`flex-1 p-3 rounded-xl border transition-all ${hasBeverages ? 'bg-amber-50 border-amber-500 text-amber-700 font-bold' : 'bg-zinc-50 border-zinc-200'}`}>Incluir Bebidas</button>
+                      </div>
+                      {hasBeverages && (
+                        <div className="space-y-4 pt-4 border-t">
+                          <div>
+                            <label className="block text-sm font-medium text-zinc-500 mb-2">Plano de Bebidas</label>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                              {BEVERAGE_TYPES.map(b => (
+                                <button key={b.id} onClick={() => setBeverageSelection(b.id)} className={`p-2 text-xs rounded-lg border transition-all ${beverageSelection === b.id ? 'bg-amber-50 border-amber-500 font-bold' : 'bg-zinc-50'}`}>{b.label}</button>
+                              ))}
+                            </div>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-zinc-500 mb-2">Bar de Drinks</label>
+                            <select value={drinkSelection} onChange={(e) => setDrinkSelection(e.target.value)} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl">
+                              {DRINK_TYPES.map(d => <option key={d.id} value={d.id}>{d.label}</option>)}
+                            </select>
+                          </div>
+                        </div>
+                      )}
+                    </section>
+
+                    {/* Equipe / Serviços */}
+                    <section className="bg-white rounded-2xl p-6 shadow-sm border border-zinc-200">
+                      <h2 className="text-lg font-semibold mb-4 flex items-center gap-2"><i className="fa-solid fa-user-group text-amber-500"></i> Equipe Adicional</h2>
+                      <div className="flex gap-4 mb-4">
+                        <button onClick={() => setHasServices(false)} className={`flex-1 p-3 rounded-xl border transition-all ${!hasServices ? 'bg-amber-50 border-amber-500 text-amber-700 font-bold' : 'bg-zinc-50 border-zinc-200'}`}>Equipe Padrão</button>
+                        <button onClick={() => setHasServices(true)} className={`flex-1 p-3 rounded-xl border transition-all ${hasServices ? 'bg-amber-50 border-amber-500 text-amber-700 font-bold' : 'bg-zinc-50 border-zinc-200'}`}>Adicionar Profissionais</button>
+                      </div>
+                      {hasServices && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-4 border-t">
+                          {SERVICES_OPTIONS.map(item => {
+                            const sel = servicesSelections[item.id];
+                            return (
+                              <div key={item.id} className={`flex items-center justify-between p-3 rounded-xl border transition-all ${sel?.selected ? 'bg-amber-50 border-amber-300' : 'bg-zinc-50 border-zinc-200'}`}>
+                                <label className="flex items-center gap-3 cursor-pointer flex-1">
+                                  <input type="checkbox" checked={!!sel?.selected} onChange={() => setServicesSelections(prev => ({...prev, [item.id]: {selected: !prev[item.id]?.selected, qty: prev[item.id]?.qty || 1}}))} className="w-5 h-5 accent-amber-500" />
+                                  <span className="text-sm font-medium">{item.label}</span>
+                                </label>
+                                {sel?.selected && (
+                                  <input type="number" min="1" value={sel.qty} onChange={(e) => setServicesSelections(prev => ({...prev, [item.id]: {...prev[item.id], qty: parseInt(e.target.value) || 1}}))} className="w-12 p-1 text-center border rounded-lg bg-white" />
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </section>
+
+                    {/* Entretenimento */}
+                    <section className="bg-white rounded-2xl p-6 shadow-sm border border-zinc-200">
+                      <h2 className="text-lg font-semibold mb-4 flex items-center gap-2"><i className="fa-solid fa-music text-amber-500"></i> Som e Entretenimento</h2>
+                      <div className="flex gap-4 mb-4">
+                        <button onClick={() => setHasEntertainment(false)} className={`flex-1 p-3 rounded-xl border transition-all ${!hasEntertainment ? 'bg-amber-50 border-amber-500 text-amber-700 font-bold' : 'bg-zinc-50 border-zinc-200'}`}>Sem Atrações</button>
+                        <button onClick={() => setHasEntertainment(true)} className={`flex-1 p-3 rounded-xl border transition-all ${hasEntertainment ? 'bg-amber-50 border-amber-500 text-amber-700 font-bold' : 'bg-zinc-50 border-zinc-200'}`}>Escolher Atrações</button>
+                      </div>
+                      {hasEntertainment && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-4 border-t">
+                          {ENTERTAINMENT_OPTIONS.map(item => (
+                            <label key={item.id} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${entertainmentSelections[item.id] ? 'bg-amber-50 border-amber-300' : 'bg-zinc-50 border-zinc-200'}`}>
+                              <input type="checkbox" checked={!!entertainmentSelections[item.id]} onChange={() => setEntertainmentSelections(prev => ({...prev, [item.id]: !prev[item.id]}))} className="w-5 h-5 accent-amber-500" />
+                              <span className="text-sm font-medium">{item.label}</span>
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                    </section>
+
+                  </div>
+
+                  {/* Resumo Coluna Direita (Visão Admin) */}
+                  <div className="lg:col-span-4 print:col-span-12">
+                    <div className="bg-white rounded-2xl shadow-xl border border-zinc-200 p-6 sticky top-6 print:shadow-none print:border-none print:p-0">
+                      
+                      {/* Cabelhaço Impressão */}
+                      <div className="hidden print:block text-center mb-8 border-b-2 border-zinc-200 pb-6">
+                        <h1 className="text-3xl font-bold uppercase tracking-widest text-zinc-900 mb-2">Villa dos Anjos</h1>
+                        <p className="text-zinc-500">Proposta de Orçamento</p>
+                      </div>
+
+                      <h2 className="text-xl font-bold mb-4 pb-4 border-b text-zinc-800 flex items-center justify-between print:hidden">
+                        Resumo da Proposta
+                        <i className="fa-solid fa-file-invoice text-amber-500"></i>
+                      </h2>
+
+                      <div className="space-y-4">
+                        {clientName && <div className="flex justify-between text-sm"><span className="text-zinc-500">Cliente:</span> <span className="font-bold text-right">{clientName}</span></div>}
+                        <div className="flex justify-between text-sm"><span className="text-zinc-500">Data do Evento:</span> <span className="font-bold">{formatDateBR(selectedDate)}</span></div>
+                        <div className="flex justify-between text-sm"><span className="text-zinc-500">Convidados:</span> <span className="font-bold">{guests} pessoas</span></div>
+                        
+                        <div className="pt-4 border-t">
+                          <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-widest mb-3">Itens Inclusos</h3>
+                          <div className="space-y-2">
+                            {hasDecoration ? <p className="text-sm flex items-center gap-2 font-medium"><i className="fa-solid fa-check text-green-500"></i> Decoração {decorationType}</p> : <p className="text-sm text-zinc-400 italic">Nenhuma decoração</p>}
+                            {hasBuffet ? <p className="text-sm flex items-center gap-2 font-medium"><i className="fa-solid fa-check text-green-500"></i> Buffet Personalizado ({buffetItemsList.length} itens)</p> : <p className="text-sm text-zinc-400 italic">Buffet por conta do cliente</p>}
+                            {hasBeverages && <p className="text-sm flex items-center gap-2 font-medium"><i className="fa-solid fa-check text-green-500"></i> Bebidas: {BEVERAGE_TYPES.find(b=>b.id===beverageSelection)?.label}</p>}
+                            {servicesItemsList.length > 0 && <p className="text-sm flex items-center gap-2 font-medium"><i className="fa-solid fa-check text-green-500"></i> {servicesItemsList.length} Profissionais Adicionais</p>}
+                            {entItemsList.length > 0 && <p className="text-sm flex items-center gap-2 font-medium"><i className="fa-solid fa-check text-green-500"></i> Som/Música inclusos</p>}
+                          </div>
+                        </div>
+
+                        {/* Bloco de Valor e Cálculos (Sempre visível no Admin) */}
+                        <div className="mt-8 p-5 bg-zinc-900 rounded-2xl text-white relative overflow-hidden print:bg-zinc-100 print:text-zinc-900 print:border print:border-zinc-300">
+                          <div className="absolute top-0 right-0 p-2 opacity-10 print:hidden"><i className="fa-solid fa-calculator text-5xl"></i></div>
+                          <p className="text-xs text-amber-500 font-bold uppercase mb-1 print:text-zinc-500">Investimento Total Estimado</p>
+                          <p className="text-4xl font-black">{formatCurrency(totalCost)}</p>
+                          
+                          <div className="mt-4 pt-4 border-t border-zinc-800 print:border-zinc-300 text-[10px] text-zinc-400 print:text-zinc-600 flex justify-between">
+                              <span>TAXA: {includeServiceTax ? '10% INCLUSO' : 'LÍQUIDO'}</span>
+                              <span className="uppercase">{ruleName}</span>
+                          </div>
+                          
+                          <div className="mt-3 print:hidden">
+                             <label className="flex items-center gap-2 text-[10px] cursor-pointer hover:text-amber-300 transition-colors">
+                                <input type="checkbox" checked={includeServiceTax} onChange={(e) => setIncludeServiceTax(e.target.checked)} className="accent-amber-500" />
+                                APLICAR 10% DE TAXA DE SERVIÇO SOBRE O TOTAL
+                             </label>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-8 space-y-3 print:hidden">
+                        <button onClick={() => window.print()} className="w-full bg-zinc-100 hover:bg-zinc-200 text-zinc-800 font-bold py-3 rounded-2xl transition-all flex items-center justify-center gap-2">
+                          <i className="fa-solid fa-print"></i> Gerar PDF Oficial
+                        </button>
+
+                        <div className="grid grid-cols-2 gap-3 pt-2">
+                          <button onClick={handleSaveBudget} className="w-full bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 font-bold py-3 rounded-xl transition-all flex items-center justify-center gap-2 text-sm">
+                            <i className="fa-solid fa-download"></i> Salvar
+                          </button>
+                          
+                          <button onClick={handleImportClick} className="w-full bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 font-bold py-3 rounded-xl transition-all flex items-center justify-center gap-2 text-sm">
+                            <i className="fa-solid fa-upload"></i> Importar
+                          </button>
+                          <input 
+                            type="file" 
+                            accept=".json" 
+                            ref={fileInputRef} 
+                            onChange={handleFileUpload} 
+                            style={{ display: 'none' }} 
+                          />
+                        </div>
+                      </div>
+                      
+                      <p className="mt-6 text-xs text-center text-zinc-400 print:block hidden">
+                        * Valores sujeitos a alteração sem aviso prévio. Orçamento válido por 15 dias.
+                      </p>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+            </div>
+          );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
